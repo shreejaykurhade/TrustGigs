@@ -1,92 +1,99 @@
 # 🛡️ TrustGig: Decentralized Freelance Escrow
 
-A premium, dark-themed Web3 marketplace that uses Ethereum Smart Contracts to ensure safe and trustless transactions between clients and freelancers.
+Welcome to **TrustGig**! This project is a decentralized application (dApp) designed to make freelancing safe. It uses "Smart Contracts" to ensure that freelancers get paid and clients get the work they asked for, without needing to trust each other or a middle-man.
 
 ---
 
-## 🏗️ Project Architecture
+## � What is Web3? (For Beginners)
 
-TrustGig is built on a "State Machine" architecture where the lifecycle of a job is strictly controlled by a Smart Contract.
+If you are new to this, think of **Web2** (the current internet like Facebook or Uber) as a system where a single big company owns the data and the "rules." 
 
-### **The Three Layers:**
-1.  **The Engine (Smart Contract)**: `TrustGig.sol`
-    - Written in Solidity.
-    - Acts as the "Digital Judge" that holds funds in escrow.
-    - Defines states: `OPEN` -> `ASSIGNED` -> `COMPLETED` -> `PAID`.
-2.  **The Bridge (Ether.js & EscrowService)**: `src/utils/EscrowService.js`
-    - Connects the browser (MetaMask) to the local blockchain.
-    - Translates user clicks into complex blockchain transactions.
-3.  **The User Interface**: `React + Vite`
-    - A glassmorphism-inspired dashboard for managing jobs.
-    - Uses CSS variables for a premium, consistent dark-mode aesthetic.
+**Web3** is different. It's the **Decentralized Web**. Instead of one company, the "rules" and "money" are managed by a network of computers (the **Blockchain**). 
+- **No Boss**: No single person can change the rules once the code is "deployed."
+- **Transparency**: Everyone can see the transactions, but no one can fake them.
+- **Ownership**: You own your money in your "Wallet" (like MetaMask), and only you can authorize spending it.
 
 ---
 
-## ⛓️ Blockchain Basics Used
+## 🏗️ Project Architecture (How it works)
 
-- **Escrow**: A financial arrangement where a third party (the Smart Contract) holds funds until conditions are met. This prevents "Client-ran-away" and "Freelancer-didn't-deliver" scenarios.
-- **Gas**: Each transaction on the blockchain costs "Gas" (fees). On the local node, we use free test-ETH for this.
-- **Wallet (MetaMask)**: Your digital key. It signs transactions to prove you are the Client or Freelancer.
-- **Local Node (Hardhat)**: A personal blockchain running on your computer for instant, free testing.
+This project has three main parts that talk to each other:
+
+### 1. The Smart Contract (The "Digital Law")
+- **File**: `contracts/TrustGig.sol`
+- **What it is**: This is a piece of code that lives **on the blockchain**. It acts like a robotic judge.
+- **What it does**: It holds the money (Escrow). It says: *"I will hold this 1 ETH. I will only give it to the Freelancer if the Client clicks 'Approve'."* It cannot be bribed or changed.
+
+### 2. The Blockchain (The "World")
+- **Software**: `Hardhat`
+- **What it is**: Since we don't want to spend real money yet, we run a "Fake Ethereum" on your computer. 
+- **What it does**: It simulates a network of computers. It gives us test accounts with 10,000 "fake" ETH to play with.
+
+### 3. The Frontend (The "Dashboard")
+- **Software**: `React + Vite`
+- **What it is**: This is the website you see in your browser.
+- **What it does**: It uses a library called `Ethers.js` (The Bridge) to talk to the blockchain. When you click a button on the site, it asks your **MetaMask Wallet** to sign a digital permission slip to move money or create a job.
 
 ---
 
-## 🚀 How to Run
+## 🚀 Step-by-Step Guides
 
-### **Prerequisites**
-- [Node.js](https://nodejs.org/) installed.
-- [MetaMask](https://metamask.io/) browser extension.
+### **A. Initial Setup (First Time Only)**
+If you just downloaded the folder and have never run it:
+1.  **Install everything**: Open a terminal in the folder and run:
+    ```bash
+    npm install
+    ```
 
-### **Getting Started**
+### **B. How to Start (Every Time you work)**
+Open **3 separate terminal windows** and run these in order:
 
-Open three separate terminals in the project root:
-
-#### **Terminal 1: Start the Blockchain**
+#### **Terminal 1: The Blockchain Server**
 ```bash
 npx hardhat node
 ```
-> [!IMPORTANT]
-> Keep this terminal open! It prints the **Private Keys** you need for MetaMask.
+*This starts your private "Ethereum" world. Leave it running.*
 
-#### **Terminal 2: Deploy the Contract**
+#### **Terminal 2: The Logic (The "Law")**
 ```bash
-# First time or after changes
-npx hardhat compile
-
-# Deploy to local node
 npx hardhat run scripts/deploy_fixed.cjs --network localhost
 ```
-*This command automatically updates the frontend with the newest contract address.*
+*This puts your Smart Contract onto that private world. Run this EVERY time you start Terminal 1.*
 
-#### **Terminal 3: Start the Website**
+#### **Terminal 3: The Website**
 ```bash
 npm run dev
 ```
-*Open the local URL provided (usually `http://localhost:5173`).*
+*This starts the dashboard. Click the link (e.g., `http://localhost:5173`) to open it.*
 
 ---
 
-## 🛠️ MetaMask Setup
-
-1.  **Add Network**: 
-    - Network Name: `Localhost 8545`
-    - RPC URL: `http://127.0.0.1:8545`
-    - Chain ID: `31337`
-2.  **Import Accounts**: 
-    - Use the first two private keys from **Terminal 1** to import **Client** and **Freelancer** accounts.
-3.  **Reset if Stuck**: 
-    - If a transaction hangs: `MetaMask > Settings > Advanced > Clear Activity Tab Data`.
+## 🔄 How to "RE-RUN" (If things get stuck)
+If you close your laptop or the website stops updating:
+1.  **Close all 3 terminals**.
+2.  **Repeat Steps B1, B2, and B3** above.
+3.  **MetaMask Reset (Important)**:
+    - MetaMask remembers your old transactions. When you restart the blockchain (Step B1), MetaMask gets confused.
+    - **Fix**: Open MetaMask -> Settings -> Advanced -> **Clear Activity Tab Data**.
+    - This "resets" the wallet's memory so it matches the new blockchain.
 
 ---
 
-## 🔄 The Full Workflow
+## 🛠️ MetaMask Help (Your Digital Key)
 
-1.  **Client**: Posts a Job (Budget is defined).
-2.  **Freelancer**: Switches account and clicks **"Apply"**.
-3.  **Client**: Selects the Freelancer and **deposits ETH into Escrow**.
-4.  **Freelancer**: Delivers work and clicks **"Mark Done"**.
-5.  **Client**: Reviews and clicks **"Approve & Pay"**. Contract releases funds instantly.
+1.  **Connecting**: Make sure MetaMask is set to `Localhost 8545`. 
+2.  **Importing**: Click the circle in MetaMask -> "Import Account" -> Paste a **Private Key** from Terminal 1. Do this for two accounts (one for Client, one for Freelancer).
+3.  **Resetting (Crucial)**: If you restart the blockchain (Step 1), MetaMask will get confused because the "World" has been reset but MetaMask remembers the old one.
+    - **Fix**: Go to MetaMask > Settings > Advanced > **Clear Activity Tab Data**. This will fix 99% of "Pending" or "Failed" errors.
 
 ---
 
-*Made with ❤️ for the Web3 Freelancing Community.*
+## 🔄 The Lifecycle of a Gig
+
+1.  **Post**: Client posts a job description and a budget.
+2.  **Apply**: Freelancer applies (proves they are interested).
+3.  **Hire**: Client Picks the freelancer. **This is when the money is locked in Escrow.**
+4.  **Mark Done**: Freelancer finishes and signals the contract.
+5.  **Pay**: Client approves, and the contract **automatically** sends the money to the Freelancer.
+
+*TrustGig: Making the internet a safer place to work.*
