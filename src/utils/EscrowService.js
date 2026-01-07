@@ -16,9 +16,11 @@ export const getContract = async (signerOrProvider) => {
     return new ethers.Contract(CONTRACT_ADDRESS, TrustGigArtifact.abi, signerOrProvider);
 };
 
-export const postJob = async (signer, { description, reward }) => {
+export const postJob = async (signer, { description, reward, duration }) => {
     const contract = await getContract(signer);
-    const tx = await contract.postJob(description, ethers.parseEther(reward.toString()));
+    const tx = await contract.postJob(description, duration, {
+        value: ethers.parseEther(reward.toString())
+    });
     return await tx.wait();
 };
 
@@ -28,11 +30,15 @@ export const applyForJob = async (signer, jobId) => {
     return await tx.wait();
 };
 
-export const selectFreelancer = async (signer, jobId, freelancer, amount, duration) => {
+export const selectFreelancer = async (signer, jobId, freelancer, duration) => {
     const contract = await getContract(signer);
-    const tx = await contract.selectFreelancer(jobId, freelancer, duration, {
-        value: ethers.parseEther(amount.toString())
-    });
+    const tx = await contract.selectFreelancer(jobId, freelancer, duration);
+    return await tx.wait();
+};
+
+export const cancelJob = async (signer, jobId) => {
+    const contract = await getContract(signer);
+    const tx = await contract.cancelJob(jobId);
     return await tx.wait();
 };
 
@@ -87,5 +93,6 @@ const parseGig = (job) => ({
     status: Number(job.status), // 0: OPEN, 1: ASSIGNED, 2: COMPLETED, 3: PAID, 4: REFUNDED
     description: job.description,
     reward: ethers.formatEther(job.reward),
-    applicants: job.applicants
+    applicants: job.applicants,
+    duration: job.duration.toString()
 });

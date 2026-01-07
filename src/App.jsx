@@ -9,7 +9,8 @@ import {
   approveAndPay,
   requestRevision,
   freelancerRefund,
-  refund
+  refund,
+  cancelJob
 } from './utils/EscrowService';
 import CreateGigModal from './components/CreateGigModal';
 import { ethers } from 'ethers';
@@ -22,6 +23,7 @@ function App() {
   const [gigs, setGigs] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [txStatus, setTxStatus] = useState('pending'); // pending, success
 
   useEffect(() => {
     checkWallet();
@@ -95,17 +97,26 @@ function App() {
 
   const handlePostJob = async (data) => {
     setLoading(true);
+    setTxStatus('pending');
     try {
       const { signer } = await connectWallet();
       const tx = await postJob(signer, data);
       console.log("Job posted tx:", tx.hash);
 
-      await fetchGigs();
+      setTxStatus('success');
+      // Wait for block confirmation and state update
       setTimeout(async () => {
-        await fetchGigs();
-        setLoading(false);
-        setShowModal(false);
-      }, 1500);
+        try {
+          await fetchGigs();
+          setLoading(false);
+          setShowModal(false);
+          setTxStatus('pending');
+          setActiveTab('my-hires'); // Redirect to manage the new hire
+        } catch (fErr) {
+          console.error("Post-tx fetch error:", fErr);
+          setLoading(false);
+        }
+      }, 2000);
     } catch (err) {
       console.error(err);
       alert("Transaction failed: " + (err.reason || err.message));
@@ -115,16 +126,23 @@ function App() {
 
   const handleAction = async (actionFn, ...args) => {
     setLoading(true);
+    setTxStatus('pending');
     try {
       const { signer } = await connectWallet();
       const tx = await actionFn(signer, ...args);
       console.log("Action tx:", tx.hash);
 
-      await fetchGigs();
+      setTxStatus('success');
       setTimeout(async () => {
-        await fetchGigs();
-        setLoading(false);
-      }, 1500);
+        try {
+          await fetchGigs();
+          setLoading(false);
+          setTxStatus('pending');
+        } catch (fErr) {
+          console.error("Post-action fetch error:", fErr);
+          setLoading(false);
+        }
+      }, 2000);
     } catch (err) {
       console.error(err);
       alert("Action failed: " + (err.reason || err.message));
@@ -134,15 +152,17 @@ function App() {
 
   // Filtering Logic
   const filteredGigs = gigs.filter(gig => {
+    const isOwner = gig.client.toLowerCase() === account?.toLowerCase();
     if (activeTab === 'marketplace') {
-      return gig.status === 0; // Only show open jobs
+      return gig.status === 0 && !isOwner; // Don't show your own jobs in marketplace
     }
     if (activeTab === 'my-hires') {
-      return gig.client.toLowerCase() === account?.toLowerCase();
+      return isOwner; // All jobs you posted are in "My Hires"
     }
     if (activeTab === 'my-gigs') {
-      return gig.freelancer.toLowerCase() === account?.toLowerCase() ||
-        gig.applicants.some(a => a.toLowerCase() === account?.toLowerCase());
+      const isFreelancer = gig.freelancer.toLowerCase() === account?.toLowerCase();
+      const hasApplied = gig.applicants.some(a => a.toLowerCase() === account?.toLowerCase());
+      return isFreelancer || hasApplied;
     }
     return true;
   });
@@ -236,7 +256,8 @@ function App() {
                 gig={gig}
                 currentAccount={account}
                 onApply={() => handleAction(applyForJob, gig.id)}
-                onSelect={(freelancer) => handleAction(selectFreelancer, gig.id, freelancer, gig.reward, 14)}
+                onSelect={(freelancer) => handleAction(selectFreelancer, gig.id, freelancer, 14)}
+                onCancel={() => handleAction(cancelJob, gig.id)}
                 onComplete={() => handleAction(markCompleted, gig.id)}
                 onPay={() => handleAction(approveAndPay, gig.id)}
                 onRevision={() => handleAction(requestRevision, gig.id)}
@@ -249,10 +270,27 @@ function App() {
       </div>
       {showModal && <CreateGigModal onClose={() => setShowModal(false)} onCreate={handlePostJob} />}
       {loading && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(5, 5, 8, 0.9)', backdropFilter: 'blur(10px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 200 }}>
-          <div className="loading-pulse" style={{ width: 60, height: 60, borderRadius: '50%', background: 'linear-gradient(135deg, hsl(var(--accent-primary)), hsl(var(--accent-secondary)))', marginBottom: '2rem', boxShadow: '0 0 40px hsla(var(--accent-primary), 0.5)' }} />
-          <div className="shimmer-text" style={{ fontSize: '1.5rem', fontWeight: '700' }}>Confirming Transaction...</div>
-          <p style={{ color: 'hsl(var(--text-muted))', marginTop: '1rem', fontSize: '0.9rem' }}>Please check your MetaMask wallet</p>
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(5, 5, 8, 0.9)', backdropFilter: 'blur(12px)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
+          {txStatus === 'pending' ? (
+            <>
+              <div className="loading-pulse" style={{ width: 80, height: 80, borderRadius: '50%', border: '2px solid hsla(var(--accent-primary), 0.3)', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2.5rem' }}>
+                <div style={{ position: 'absolute', inset: -10, borderRadius: '50%', border: '2px solid hsl(var(--accent-primary))', borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
+                <div style={{ width: 40, height: 40, borderRadius: '50%', background: 'linear-gradient(135deg, hsl(var(--accent-primary)), hsl(var(--accent-secondary)))', boxShadow: '0 0 30px hsla(var(--accent-primary), 0.5)' }} />
+              </div>
+              <div className="shimmer-text" style={{ fontSize: '1.75rem', fontWeight: '800' }}>Confirming Transaction</div>
+              <p style={{ color: 'hsl(var(--text-muted))', marginTop: '1rem', fontSize: '1rem' }}>Please check your MetaMask wallet</p>
+            </>
+          ) : (
+            <>
+              <div className="fade-in" style={{ width: 80, height: 80, borderRadius: '50%', background: 'hsl(var(--accent-success))', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '2.5rem', boxShadow: '0 0 40px hsla(var(--accent-success), 0.4)' }}>
+                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+              </div>
+              <div style={{ fontSize: '1.75rem', fontWeight: '800', color: 'white' }}>Success!</div>
+              <p style={{ color: 'hsl(var(--text-muted))', marginTop: '1rem', fontSize: '1rem' }}>Blockchain has been updated</p>
+            </>
+          )}
         </div>
       )}
 
@@ -271,7 +309,7 @@ function App() {
 }
 
 
-const GigCard = ({ gig, currentAccount, onApply, onSelect, onComplete, onPay, onRevision, onFreelancerRefund, onRefund }) => {
+const GigCard = ({ gig, currentAccount, onApply, onSelect, onCancel, onComplete, onPay, onRevision, onFreelancerRefund, onRefund }) => {
   const isClient = currentAccount?.toLowerCase() === gig.client?.toLowerCase();
   const isFreelancer = currentAccount?.toLowerCase() === gig.freelancer?.toLowerCase();
   const hasApplied = gig.applicants.some(a => a.toLowerCase() === currentAccount?.toLowerCase());
@@ -301,12 +339,22 @@ const GigCard = ({ gig, currentAccount, onApply, onSelect, onComplete, onPay, on
       <div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
           <span className={`status-badge ${status.class}`}>{status.label}</span>
-          <span style={{ fontSize: '1.4rem', fontWeight: '800', color: 'hsl(var(--accent-success))' }}>{gig.status === 0 ? gig.reward : gig.amount} ETH</span>
+          <span style={{ fontSize: '1.4rem', fontWeight: '800', color: 'hsl(var(--accent-success))' }}>
+            {gig.status === 0 || gig.status >= 3 ? gig.reward : gig.amount} ETH
+          </span>
         </div>
         <h3 style={{ fontSize: '1.3rem', fontWeight: '600', lineHeight: 1.3 }}>{gig.description}</h3>
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '14px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.8rem', color: 'hsl(var(--text-muted))' }}>
+            {gig.status === 0 ? 'Expected Duration' : 'Deadline'}
+          </span>
+          <span style={{ fontSize: '0.85rem', fontWeight: '600', color: 'hsl(var(--accent-warning))' }}>
+            {gig.status === 0 ? `${gig.duration} Days` : gig.deadline}
+          </span>
+        </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <span style={{ fontSize: '0.8rem', color: 'hsl(var(--text-muted))' }}>Client</span>
           <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>{gig.client.slice(0, 8)}...{gig.client.slice(-4)}</span>
@@ -341,13 +389,17 @@ const GigCard = ({ gig, currentAccount, onApply, onSelect, onComplete, onPay, on
                   <div style={{ fontSize: '0.8rem', opacity: 0.5, fontStyle: 'italic', textAlign: 'center', padding: '10px' }}>Waiting for talent...</div>
                 ) : (
                   gig.applicants.map(addr => (
-                    <div key={addr} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.05)', padding: '8px 12px', borderRadius: '10px' }}>
-                      <span style={{ fontSize: '0.8rem' }}>{addr.slice(0, 14)}...</span>
-                      <button className="btn-primary" style={{ padding: '6px 12px', fontSize: '0.75rem' }} onClick={() => onSelect(addr)}>Hire</button>
+                    <div key={addr} className="applicant-row">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <div style={{ width: 32, height: 32, borderRadius: '50%', background: 'hsla(0,0%,100%,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' }}>👤</div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: '500' }}>{addr.slice(0, 10)}...{addr.slice(-4)}</span>
+                      </div>
+                      <button className="btn-primary" style={{ padding: '8px 16px', fontSize: '0.8rem', borderRadius: '10px' }} onClick={() => onSelect(addr)}>Hire</button>
                     </div>
                   ))
                 )}
               </div>
+              <button className="btn-secondary" style={{ marginTop: '1.25rem', width: '100%', color: 'hsl(var(--accent-error))', borderStyle: 'dashed' }} onClick={onCancel}>Cancel & Refund Bounty</button>
             </div>
           )}
 

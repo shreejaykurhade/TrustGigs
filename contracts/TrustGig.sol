@@ -14,6 +14,7 @@ contract TrustGig {
         string description;
         uint256 reward; // Proposed reward for the job
         address[] applicants;
+        uint256 duration; // Expected duration in days
     }
 
     uint256 public jobCounter;
@@ -28,15 +29,17 @@ contract TrustGig {
     event JobRefunded(uint256 indexed id, uint256 amount);
     event RevisionRequested(uint256 indexed id);
 
-    function postJob(string memory _description, uint256 _reward) external {
+    function postJob(string memory _description, uint256 _duration) external payable {
+        require(msg.value > 0, "Reward must be greater than zero");
         jobCounter++;
         jobs[jobCounter].id = jobCounter;
         jobs[jobCounter].client = msg.sender;
         jobs[jobCounter].description = _description;
-        jobs[jobCounter].reward = _reward;
+        jobs[jobCounter].reward = msg.value;
+        jobs[jobCounter].duration = _duration;
         jobs[jobCounter].status = JobStatus.OPEN;
 
-        emit JobPosted(jobCounter, msg.sender, _description, _reward);
+        emit JobPosted(jobCounter, msg.sender, _description, msg.value);
     }
 
     function applyForJob(uint256 _jobId) external {
@@ -51,19 +54,36 @@ contract TrustGig {
         emit Applied(_jobId, msg.sender);
     }
 
-    function selectFreelancer(uint256 _jobId, address _freelancer, uint256 _durationInDays) external payable {
+    function selectFreelancer(uint256 _jobId, address _freelancer, uint256 _durationInDays) external {
         Job storage job = jobs[_jobId];
         require(msg.sender == job.client, "Only client can select");
         require(job.status == JobStatus.OPEN, "Job is not open");
         require(hasApplied[_jobId][_freelancer], "Address did not apply");
-        require(msg.value > 0, "Escrow deposit required");
 
         job.freelancer = _freelancer;
-        job.amount = msg.value;
+        job.amount = job.reward;
         job.deadline = block.timestamp + (_durationInDays * 1 days);
         job.status = JobStatus.ASSIGNED;
 
-        emit JobAssigned(_jobId, _freelancer, msg.value);
+        emit JobAssigned(_jobId, _freelancer, job.reward);
+    }
+
+    function cancelJob(uint256 _jobId) external {
+        Job storage job = jobs[_jobId];
+        require(msg.sender == job.client, "Only client can cancel");
+        require(job.status == JobStatus.OPEN, "Job is not open or already assigned");
+
+        uint256 refundAmount = job.reward;
+        require(refundAmount > 0, "No funds to refund");
+
+        job.status = JobStatus.REFUNDED;
+        job.reward = 0;
+        job.amount = 0;
+
+        (bool success, ) = payable(job.client).call{value: refundAmount}("");
+        require(success, "Cancel refund failed");
+        
+        emit JobRefunded(_jobId, refundAmount);
     }
 
     function markCompleted(uint256 _jobId) external {
@@ -89,10 +109,16 @@ contract TrustGig {
         require(msg.sender == job.client, "Only client can approve");
         require(job.status == JobStatus.COMPLETED, "Work not marked complete");
 
-        job.status = JobStatus.PAID;
         uint256 payout = job.amount;
-        job.amount = 0; // Prevent re-entrance
-        payable(job.freelancer).transfer(payout);
+        require(payout > 0, "No funds to release");
+        
+        job.status = JobStatus.PAID;
+        job.amount = 0;
+        job.reward = 0; // Clear both to be safe
+
+        (bool success, ) = payable(job.freelancer).call{value: payout}("");
+        require(success, "Transfer to freelancer failed");
+        
         emit JobPaid(_jobId, payout);
     }
 
@@ -101,10 +127,16 @@ contract TrustGig {
         require(msg.sender == job.freelancer, "Only freelancer can refund");
         require(job.status == JobStatus.ASSIGNED || job.status == JobStatus.COMPLETED, "Not in a refundable state");
 
-        job.status = JobStatus.REFUNDED;
         uint256 refundAmount = job.amount;
+        require(refundAmount > 0, "No funds to refund");
+
+        job.status = JobStatus.REFUNDED;
         job.amount = 0;
-        payable(job.client).transfer(refundAmount);
+        job.reward = 0;
+
+        (bool success, ) = payable(job.client).call{value: refundAmount}("");
+        require(success, "Refund to client failed");
+        
         emit JobRefunded(_jobId, refundAmount);
     }
 
@@ -114,10 +146,16 @@ contract TrustGig {
         require(job.status == JobStatus.ASSIGNED || job.status == JobStatus.COMPLETED, "Cannot refund in this state");
         require(block.timestamp > job.deadline, "Deadline not passed");
 
-        job.status = JobStatus.REFUNDED;
         uint256 refundAmount = job.amount;
+        require(refundAmount > 0, "No funds to refund");
+
+        job.status = JobStatus.REFUNDED;
         job.amount = 0;
-        payable(job.client).transfer(refundAmount);
+        job.reward = 0;
+
+        (bool success, ) = payable(job.client).call{value: refundAmount}("");
+        require(success, "Refund to client failed");
+        
         emit JobRefunded(_jobId, refundAmount);
     }
 
@@ -130,7 +168,8 @@ contract TrustGig {
         JobStatus status,
         string memory description,
         uint256 reward,
-        address[] memory applicants
+        address[] memory applicants,
+        uint256 duration
     ) {
         Job storage job = jobs[_jobId];
         return (
@@ -142,7 +181,8 @@ contract TrustGig {
             job.status,
             job.description,
             job.reward,
-            job.applicants
+            job.applicants,
+            job.duration
         );
     }
 }
