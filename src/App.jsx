@@ -84,13 +84,14 @@ function App() {
         provider = new ethers.BrowserProvider(window.ethereum);
       }
       const data = await getGigs(provider);
-      console.log("Fetched gigs:", data);
+      console.log("Current account for filtering:", account);
+      console.log("Fetched gigs data:", data);
       setGigs(data);
       if (account) updateBalance(account);
     } catch (err) {
       console.error("Fetch Error:", err);
       if (account) {
-        console.log("Failed to fetch gigs. Check if contract is deployed to the correct address.");
+        console.log("Failed to fetch gigs. Check if contract is deployed to the correct address. Current Account:", account);
       }
     }
   };
@@ -154,7 +155,7 @@ function App() {
   const filteredGigs = gigs.filter(gig => {
     const isOwner = gig.client.toLowerCase() === account?.toLowerCase();
     if (activeTab === 'marketplace') {
-      return gig.status === 0 && !isOwner; // Don't show your own jobs in marketplace
+      return gig.status === 0; // Show all open jobs in marketplace
     }
     if (activeTab === 'my-hires') {
       return isOwner; // All jobs you posted are in "My Hires"
