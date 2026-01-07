@@ -1,6 +1,6 @@
-# 🛡️ TrustGig: Decentralized Freelance Escrow
+# 🛡️ TrustGigs: Decentralized Freelance Escrow
 
-Welcome to **TrustGig**! This project is a decentralized application (dApp) designed to make freelancing safe. It uses "Smart Contracts" to ensure that freelancers get paid and clients get the work they asked for, without needing to trust each other or a middle-man.
+Welcome to **TrustGigs**! This project is a decentralized application (dApp) designed to make freelancing safe. It uses "Smart Contracts" to ensure that freelancers get paid and clients get the work they asked for, without needing to trust each other or a middle-man.
 
 ---
 
